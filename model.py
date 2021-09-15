@@ -20,7 +20,7 @@ def get_affine_inverse(affine_matrix):
 
 def get_affine_matrix_with_cossin(cos_sin,scale,shift):
     scale = torch.diag_embed(scale)
-    
+
     cos_theta = cos_sin[:,0:1]
     sin_theta = cos_sin[:,1:2]
     rotate = torch.cat((cos_theta, -sin_theta, sin_theta, cos_theta),dim=-1).view(-1,2,2)
@@ -40,7 +40,7 @@ def get_mu_and_cov(part_maps,thr = 0.02):
 
     # 生成grid
     x_t = torch.linspace(-1.0, 1.0, w).reshape((w,1)).repeat(1,h).unsqueeze(0).type(part_maps.type())
-    y_t = torch.linspace(-1.0, 1.0, 
+    y_t = torch.linspace(-1.0, 1.0,
     h).reshape((1,h)).repeat(w,1).unsqueeze(0).type(part_maps.type())
     meshgrid = torch.cat([y_t,x_t],0).type(part_maps.type()).view(1,1,2,w,h)
     part_maps_mask = part_maps.unsqueeze(2).clone()
@@ -53,12 +53,12 @@ def get_mu_and_cov(part_maps,thr = 0.02):
     # get mu
     mu = mesh_value.view(batch,channels,2,-1).sum(dim=-1)/(count_value.view(batch,channels,1))
     # print(mu.shape,"mu.shape")
-    
+
     mu_out_prod = mu.view(batch,channels,1,2).repeat(1,1,2,1)* mu.view(batch,channels,2,1)
     mesh_out_part_value = (mesh_value.view(batch,channels,1,2,-1).repeat(1,1,2,1,1)*mesh_value.view(batch,channels,2,1,-1)).sum(dim=-1)/(count_value.view(batch,channels,1,1))
 
     # # 得到协方差矩阵
-    
+
     cov = mesh_out_part_value-mu_out_prod
     # return 0,0,0
     return cov
@@ -86,8 +86,8 @@ def volume_center_loss(volume):
             average = (out/(this_volume.sum()+1e-10)).view(-1,3).sum(dim=0)
             # print(average)
             loss +=torch.abs(average).mean()
-    
-    
+
+
     # print(all_average)
     return loss/(batch*part)
 
@@ -112,7 +112,7 @@ def get_centers(part_maps, detach_k=True, epsilon=1e-8, self_ref_coord=False):
     C,H,W = part_maps.shape
     centers = []
     for c in range(C):
-        part_map = part_maps[c,:,:] 
+        part_map = part_maps[c,:,:]
         k = (part_map).sum()+epsilon
         part_map_pdf = part_map/k
         x_c, y_c = get_center(part_map_pdf, self_ref_coord)
@@ -144,7 +144,7 @@ def batch_get_centers(pred_softmax):
 
 
 def concentration_loss(pred_softmax,zero_center=False):
-    
+
     B,part_numb,C,H,W = pred_softmax.shape
     pred_softmax = pred_softmax.view(B,part_numb,H,W)
     pred_softmax = pred_softmax[:,0:-1]
@@ -154,7 +154,7 @@ def concentration_loss(pred_softmax,zero_center=False):
     if zero_center:
         # return torch.abs(centers_all).mean().sum()
         centers_all =  torch.zeros(centers_all.shape).type(centers_all.type())
-        
+
     for b in range(B):
         centers = centers_all[b]
         for c in range(part_numb-1):
@@ -171,10 +171,10 @@ def concentration_loss(pred_softmax,zero_center=False):
 
 def generate_invese_matrix_for_torch(theta,scale, shift):
     inv_scale = torch.diag_embed(1. / scale)
-    
+
     sin_theta = torch.sin(theta)
     cos_theta = torch.cos(theta)
-    
+
     inv_rotate = torch.cat((cos_theta, sin_theta, -sin_theta, cos_theta),dim=-1).view(-1,2,2)
 
     inv_scale_rotate = torch.bmm(inv_scale, inv_rotate)
@@ -198,10 +198,10 @@ class Feat_To_Camera(nn.Module):
             nn.Conv2d(in_channels= part_numb*32,
                     out_channels=part_numb*16, kernel_size=4, stride=2,padding=1),
             nn.LeakyReLU(0.2),
-            
+
             nn.Conv2d(in_channels=part_numb*16,
                     out_channels=part_numb*4, kernel_size=4, stride=2,padding=1)
-            
+
         )
 
         self.get_joint = nn.Linear(part_numb*4*4*4,(self.part_numb-1)*2)
@@ -214,15 +214,15 @@ class Feat_To_Camera(nn.Module):
         self.get_scale = nn.Linear(part_numb*4*4*4,(self.part_numb-1)*2)
         self.get_scale.weight.data.zero_()
         self.get_scale.bias.data.zero_()
-        
+
     def forward(self, x):
         feature = self.volume_feature(x)
         b,t,w,h = feature.shape
-    
+
         feature = feature.view(b, -1)
         # affine = affine.sum(-1)
         zeros_affine = torch.tensor([1,0]*b).view(b,1,2).type(x.type())
-        
+
         affine = self.get_joint(feature)
         affine = affine.view(b,-1,2)
         # print(affine)
@@ -231,7 +231,7 @@ class Feat_To_Camera(nn.Module):
         affine = affine.view(-1,  2)
         affine = affine/(torch.norm(affine,p=2,dim=1,keepdim=True)+1e-10)
         # print(affine)
-        # 
+        #
         # print(affine)
         shift = self.get_shift(feature)
         zeros_shift = torch.zeros((b,1,2)).type(shift.type())
@@ -254,7 +254,7 @@ class Feat_To_Camera(nn.Module):
         theta = affine.view(b*self.part_numb,2)
         shift = shift.view(b*self.part_numb,2)
         scale = scale.view(b*self.part_numb,2)
-        
+
         return theta,scale,shift
         # return affine_f
 
@@ -278,7 +278,7 @@ class Encoder(nn.Module):
         self.hourglas = Hourglass(512, 512, 3, 1024)
         self.merge_feature = nn.Sequential(
             nn.Conv2d(1024, 32*part_numb*4, 3, 1, 1, bias=True),
-        )  
+        )
         self.get_2d_heat = nn.Sequential(
             nn.Conv2d(32*part_numb*4, part_numb*32, 7, 1, 3, bias=True),
             nn.LeakyReLU(0.2),
@@ -295,7 +295,7 @@ class Encoder(nn.Module):
         feature = self.hourglas(feature)
         merge_feature = self.merge_feature(feature)
 
-       
+
         volume = self.get_2d_heat(merge_feature)
 
         volume = volume.view(b,self.part_numb,-1,32,32)
@@ -355,7 +355,7 @@ class Decoder(nn.Module):
         # print(all_image.shape)
         return fina_image,all_image,all_weight
 
- 
+
 class Vgg19(torch.nn.Module):
     def __init__(self, requires_grad=False):
         super(Vgg19, self).__init__()
@@ -399,7 +399,7 @@ vgg = Vgg19().cuda()
 
 def get_vgg_loss(x_vgg, y_vgg):
     value_total = 0
-    loss_weight = [1.0/32, 1.0/16, 1.0/8, 1.0/4, 1.0]  
+    loss_weight = [1.0/32, 1.0/16, 1.0/8, 1.0/4, 1.0]
     for i in range(len(x_vgg)):
         b, c, w, h = x_vgg[i].shape
         # print('vggggggggg',x_vgg[i].shape)
@@ -414,7 +414,7 @@ def get_random_matrix(batch_size,data_type):
     # print(rotation_joint)
     shift=torch.rand(batch_size,2)*0.2
     basic = generate_invese_matrix_for_torch(rotation_joint,scale,shift).type(data_type)
-    
+
     return basic
 
 def gradient_loss(gen_frames, gt_frames, alpha=1):
@@ -434,7 +434,7 @@ def gradient_loss(gen_frames, gt_frames, alpha=1):
         bottom = F.pad(x, [0, 0, 0, 1])[:, :, 1:, :]
 
         # dx, dy = torch.abs(right - left), torch.abs(bottom - top)
-        dx, dy = right - left, bottom - top 
+        dx, dy = right - left, bottom - top
         # dx will always have zeros in the last column, right-left
         # dy will always have zeros in the last row,    bottom-top
         dx[:, :, :, -1] = 0
@@ -462,7 +462,7 @@ class Part_3D_Disnet(nn.Module):
         self.part_numb=part_numb
         self.mse = nn.MSELoss()
         self.l1 = nn.L1Loss()
-        
+
 
 
     def affine_trans_image(self,image):
@@ -484,12 +484,12 @@ class Part_3D_Disnet(nn.Module):
     def test(self, image_source):
         out = {}
         s_volume,s_theta,s_scale,s_shift = self.encoder(image_source)
-  
+
         b, part_numb, d, w, h = s_volume.shape
-        
+
         s_affine_to_latent = get_affine_matrix_with_cossin(s_theta,s_scale,s_shift)
         s_affine_for_torch = get_affine_inverse(s_affine_to_latent)
-        
+
         s_latent_volume = self.transform_volume(s_volume,s_affine_to_latent)
 
         s_back_volume = self.transform_volume(s_latent_volume,s_affine_for_torch)
@@ -497,7 +497,7 @@ class Part_3D_Disnet(nn.Module):
 
         pred_image_s,pred_image_s_part,pred_image_s_weight = self.decoder(s_back_volume)
 
-        
+
         out['pred_image_s'] = pred_image_s
         out['pred_image_s_part'] = pred_image_s_part
         out['pred_image_s_weight'] = pred_image_s_weight
@@ -510,25 +510,25 @@ class Part_3D_Disnet(nn.Module):
         s_volume,s_theta,s_scale,s_shift = self.encoder(image_source)
 
         t_volume,t_theta,t_scale,t_shift = self.encoder(image_target)
-        
-        
+
+
 
         b, part_numb, d, w, h = s_volume.shape
 
         out['t_shift'] = t_shift.view(b,part_numb,2)
         out['s_shift'] = s_shift.view(b,part_numb,2)
-        
+
         s_affine_to_latent = get_affine_matrix_with_cossin(s_theta,s_scale,s_shift)
         s_affine_for_torch = get_affine_inverse(s_affine_to_latent)
 
         t_affine_to_latent = get_affine_matrix_with_cossin(t_theta,t_scale,t_shift)
         t_affine_for_torch = get_affine_inverse(t_affine_to_latent)
-        
-        
+
+
         s_latent_volume = self.transform_volume(s_volume,s_affine_to_latent)
         t_latent_volume = self.transform_volume(t_volume,t_affine_to_latent)
-        
-        
+
+
         s_warp_to_t_volume = self.transform_volume(s_latent_volume,t_affine_for_torch)
         t_warp_to_s_volume = self.transform_volume(t_latent_volume,s_affine_for_torch)
 
@@ -539,7 +539,7 @@ class Part_3D_Disnet(nn.Module):
 
         out['t_affine_left'] = t_affine_to_latent.view(b, part_numb, 2, 3)
         out['s_affine_left'] = s_affine_to_latent.view(b, part_numb, 2, 3)
-    
+
         out['s_warp_to_t_volume'] = s_warp_to_t_volume
         out['t_warp_to_s_volume'] = t_warp_to_s_volume
 
@@ -562,18 +562,18 @@ class Part_3D_Disnet(nn.Module):
         out['pred_image_t'] = pred_image_t
         out['pred_image_t_part'] = pred_image_t_part
         out['pred_image_t_weight'] = pred_image_t_weight
-        
+
         out['pred_image_s'] = pred_image_s
         out['pred_image_s_part'] = pred_image_s_part
         out['pred_image_s_weight'] = pred_image_s_weight
- 
+
 
         out['pred_latent_s'] = pred_latent_s
         out['pred_latent_weight'] = pred_latent_weight
         out['pred_latent_part'] = pred_latent_part
         out['image_source'] = image_source
         out['image_target'] = image_target
-    
+
         image_target_warp,warp_matrix = self.affine_trans_image(image_target)
         t_affine_base_volume,warp_theta,warp_scale,warp_shift = self.encoder(image_target_warp)
 
@@ -589,9 +589,9 @@ class Part_3D_Disnet(nn.Module):
         out['t_affine_base_volume_from_latent'] = t_affine_base_volume_from_latent
 
         warp_matrix = warp_matrix.view(b,1,2,3).repeat(1,part_numb,1,1).view(b*part_numb,2,3)
- 
+
         t_affine_volume = self.transform_volume(s_warp_to_t_volume,warp_matrix)
-  
+
 
         out['t_affine_volume'] = t_affine_volume
 
@@ -602,12 +602,12 @@ class Part_3D_Disnet(nn.Module):
         out['warp_matrix'] = warp_matrix.view(b, part_numb, 2, 3)
 
         return out
-    
+
 
 
     def calculate_loss(self, out,arg):
         loss_dict = {}
-  
+
 
         b = out['pred_image_t'].shape[0]
         p = self.part_numb
@@ -653,9 +653,9 @@ class Part_3D_Disnet(nn.Module):
             pred_matrix_basic = out['t_affine'].view(b,part_numb,2,3)[:,0:-1].contiguous().view(b*(part_numb-1),2,3)
             used_for_inverse = ((torch.Tensor([0, 0, 1])).unsqueeze(
                 0).unsqueeze(0)).repeat(b*(part_numb-1), 1, 1).type(used_matrix.type())
-        
+
             pred_matrix = torch.cat([pred_matrix,used_for_inverse],dim=1)
-            
+
             used_matrix = torch.cat([used_matrix,used_for_inverse],dim=1)
 
             pred_matrix_basic = torch.cat([pred_matrix_basic,used_for_inverse],dim=1)
@@ -670,7 +670,7 @@ class Part_3D_Disnet(nn.Module):
             # eye = torch.eye(4).view(1,1,4,4).type(value.type())
             # value = torch.abs(eye - value).mean()
             loss_dict['equivariance_affine'] = loss*arg.weight_eq
-        if   "rots_flag" in arg and arg.matrix_flag:
+        if   "rots_flag" in arg and arg.rots_flag:
             # first shift the part to center
             we_need_part = out['pred_image_t_weight'][:,:-1,0]
             b,p,w,h = we_need_part.shape
@@ -686,15 +686,15 @@ class Part_3D_Disnet(nn.Module):
             grid = F.affine_grid(matrix,we_need_part.size())
             we_need_part = F.grid_sample(we_need_part,grid)
             we_need_part =we_need_part.view(b,p,w,h)
-            
+
             batch_cov = get_mu_and_cov(we_need_part).view(-1,2,2)
             matrix_this =  out['t_affine_left'][:,:-1,:,0:2].contiguous().view(-1,2,2)
             # matrix_this_inverse = torch.inverse(matrix_this)
             loss_dict['matrix_loss'] = torch.norm(torch.bmm(matrix_this,matrix_this.permute((0,2,1)))-batch_cov,p=2)*arg.weight_rots
-            
+
 
             pass
-        return loss_dict 
+        return loss_dict
         # pass
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import pandas as pd
 from augmentation import AllAugmentationTransform
 import glob
 from torch.utils.data import DataLoader
-     
+
 def read_video(name, frame_shape):
 
     if os.path.isdir(name):
@@ -34,7 +34,7 @@ def read_video(name, frame_shape):
         video_array = video_array.reshape((-1,) + frame_shape)
         video_array = np.moveaxis(video_array, 1, 2)
     elif name.lower().endswith('.gif') or name.lower().endswith('.mp4') or name.lower().endswith('.mov'):
-        video = np.array(mimread(name))
+        video = np.array(mimread(name, memtest=False))
         if len(video.shape) == 3:
             video = np.array([gray2rgb(frame) for frame in video])
         if video.shape[-1] == 4:
@@ -53,7 +53,7 @@ class FramesDataset(Dataset):
         self.root_dir = root_dir
         self.videos = os.listdir(root_dir)
         self.frame_shape = tuple(frame_shape)
-        
+
         self.id_sampling = id_sampling
         if os.path.exists(os.path.join(root_dir, 'train')):
             assert os.path.exists(os.path.join(root_dir, 'test'))
@@ -80,10 +80,10 @@ class FramesDataset(Dataset):
 
         if self.is_train:
             self.transform = AllAugmentationTransform(**augmentation_params)
-    
+
         else:
             self.transform = None
-    
+
     def __len__(self):
 
         return len(self.videos)
@@ -113,7 +113,7 @@ class FramesDataset(Dataset):
 
         if self.transform is not None:
             video_array = self.transform(video_array)
-   
+
 
         out = {}
         if self.is_train:
